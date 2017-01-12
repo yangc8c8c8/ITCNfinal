@@ -17,7 +17,7 @@
 #include <arpa/inet.h>
 
 #define MAXSIZE 2048
-#define MAXQSIZE 25600  //25KB
+#define MAXQSIZE 25600  //25KBs
 #define FTP_PORT 8740
 #define FTP_PASV_CODE 227
 #define FTP_ADDR "140.114.71.159"
@@ -117,7 +117,7 @@ int proxy_func(int ser_port, int clifd, int rate) {
     char buffer[MAXSIZE];
     int serfd = -1, datafd = -1, connfd;
     int data_port;
-    int byte_num;
+    int byte_num,old_byte_num;
     int status, pasv[7];
     int childpid;
     socklen_t clilen;
@@ -149,7 +149,7 @@ int proxy_func(int ser_port, int clifd, int rate) {
         return -1;
     }
 
-     datafd = serfd;
+    // datafd = serfd;
 
     // initialize select vars
     FD_ZERO(&allset);
@@ -188,27 +188,30 @@ int proxy_func(int ser_port, int clifd, int rate) {
 					if ((byte_num = read(serfd, buffer, MAXSIZE)) <= 0) {
                     printf("[!] Server terminated the connection.\n");
                     break;
-					}
-					buffer[byte_num] = '\0';
+					}buffer[byte_num] = '\0';
 				}
 				else
 				{
 					if(Qbuffer.Qsize<=MAXQSIZE)
 					{
 						if ((byte_num = read(serfd, buffer, MAXSIZE)) <= 0) {
+				    			if (write(clifd, buffer, old_byte_num) < 0) {
+                    						printf("[x] Write to client failed.\n");
+                						break;
+							}
 						printf("[!] Server terminated the connection.\n");
 						break;
 						}
 						for(j=0;j<byte_num;j++)
 						{
 							Qbuffer.queue[Qbuffer.tail++]=buffer[j];
-							if(Qbuffer.tail==MAXQSIZE)Qbuffer.tail=0;
+							if(Qbuffer.tail==MAXQSIZE+MAXSIZE)Qbuffer.tail=0;
 						}
 						Qbuffer.Qsize+=byte_num;
 					}
 				}
-				
-
+			
+		old_byte_num=byte_num;
                 status = atoi(buffer);
 
                 if (status == FTP_PASV_CODE && ser_port == FTP_PORT) {
@@ -243,10 +246,12 @@ int proxy_func(int ser_port, int clifd, int rate) {
 					}
 				}
 				else 
-				{
+				{printf("%ld,%d",(1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec)),MAXSIZE*1000/rate);
 					gettimeofday(&time_end,NULL);
-					if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>=MAXSIZE/rate/1000){
-						gettimeofday(&time_start,NULL);
+					if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>= MAXSIZE*1000/rate)
+					{
+					
+					gettimeofday(&time_start,NULL);
 					
 					if(Qbuffer.Qsize>=MAXSIZE)
 					{
@@ -276,6 +281,7 @@ int proxy_func(int ser_port, int clifd, int rate) {
 						}
 					}
 					}
+					
 				}
             }
         } else {
@@ -283,6 +289,7 @@ int proxy_func(int ser_port, int clifd, int rate) {
             return -1;
         }
     }
+    free(Qbuffer.queue);
     return 0;
 }
 
