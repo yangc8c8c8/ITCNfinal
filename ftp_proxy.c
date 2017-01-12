@@ -16,10 +16,18 @@
 #include <arpa/inet.h>
 
 #define MAXSIZE 2048
+#define MAXQSIZE 51200  //50KB
 #define FTP_PORT 8740
 #define FTP_PASV_CODE 227
 #define FTP_ADDR "140.114.71.159"
 #define max(X,Y) ((X) > (Y) ? (X) : (Y))
+
+struct Queue{
+	char* queue=NULL;
+	int head=0;
+	int tail=0;
+	int Qsize=0;
+};
 
 int proxy_IP[4];
 
@@ -113,7 +121,17 @@ int proxy_func(int ser_port, int clifd, int rate) {
     int childpid;
     socklen_t clilen;
     struct sockaddr_in cliaddr;
-
+	struct Queue Qbuffer; 
+	int j;
+	struct timeval time_start,time_end;
+	
+	if(ser_port!=FTP_PORT)
+	{
+		Qbuffer.queue=(char*)malloc(MAXQSIZE+MAXSIZE);
+		gettimeofday(&time_start,NULL);  //reset time_start
+	}
+		
+	
     // select vars
     int maxfdp1;
     int i, nready = 0;
@@ -125,7 +143,7 @@ int proxy_func(int ser_port, int clifd, int rate) {
         return -1;
     }
 
-    datafd = serfd;
+    // datafd = serfd;
 
     // initialize select vars
     FD_ZERO(&allset);
@@ -139,7 +157,7 @@ int proxy_func(int ser_port, int clifd, int rate) {
         maxfdp1 = max(clifd, serfd) + 1;
 
         // select descriptor
-        nready = select(maxfdp1 + 1, &rset, NULL, NULL, NULL);
+        nready = select(maxfdp1, &rset, NULL, NULL, NULL);
         if (nready > 0) {
             // check FTP client socket fd
             if (FD_ISSET(clifd, &rset)) {
@@ -148,7 +166,6 @@ int proxy_func(int ser_port, int clifd, int rate) {
                     printf("[!] Client terminated the connection.\n");
                     break;
                 }
-
 
                 if (write(serfd, buffer, byte_num) < 0) {
                     printf("[x] Write to server failed.\n");
@@ -159,12 +176,32 @@ int proxy_func(int ser_port, int clifd, int rate) {
             // check FTP server socket fd
             if (FD_ISSET(serfd, &rset)) {
                 memset(buffer, 0, MAXSIZE);
-                if ((byte_num = read(serfd, buffer, MAXSIZE)) <= 0) {
+				
+				if(ser_port==FTP_PORT)
+				{
+					if ((byte_num = read(serfd, buffer, MAXSIZE)) <= 0) {
                     printf("[!] Server terminated the connection.\n");
                     break;
-                }
-                if(ser_port == FTP_PORT)
-                  buffer[byte_num] = '\0';
+					}
+					buffer[byte_num] = '\0';
+				}
+				else
+				{
+					if(Qsize<=MAXQSIZE)
+					{
+						if ((byte_num = read(serfd, buffer, MAXSIZE)) <= 0) {
+						printf("[!] Server terminated the connection.\n");
+						break;
+						}
+						for(j=0;j<byte_num;j++)
+						{
+							Qbuffer.queue[Qbuffer.tail++]=buffer[j];
+							if(Qbuffer.tail==MAXQSIZE)Qbuffer.tail=0;
+						}
+						Qsize+=byte_num;
+					}
+				}
+				
 
                 status = atoi(buffer);
 
@@ -192,11 +229,48 @@ int proxy_func(int ser_port, int clifd, int rate) {
                     }
                 }
 
-
-                if (write(clifd, buffer, byte_num) < 0) {
+				if(ser_port==FTP_PORT)
+				{
+					if (write(clifd, buffer, byte_num) < 0) {
                     printf("[x] Write to client failed.\n");
                     break;
-                }
+					}
+				}
+				else 
+				{
+					gettimeofday(&time_end,NULL);
+					if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>=MAXSIZE/rate/1000)
+						gettimeofday(&time_start,NULL);
+					else
+						continue;
+					if(Qsize>=MAXSIZE)
+					{
+						for(j=0;j<byte_num;j++)
+						{
+							buffer[j]=Qbuffer.queue[Qbuffer.head++];
+							if(Qbuffer.head==MAXQSIZE)Qbuffer.head=0;
+						}
+						Qsize-=MAXSIZE;
+						if (write(clifd, buffer, byte_num) < 0) {
+						printf("[x] Write to client failed.\n");
+						break;
+						}
+					}
+					else if(Qsize!=0)
+					{
+						memset(buffer, 0, MAXSIZE);
+						for(j=0;j<Qsize;j++)
+						{
+							buffer[j]=Qbuffer.queue[Qbuffer.head++];
+							if(Qbuffer.head==MAXQSIZE)Qbuffer.head=0;
+						}
+						Qsize=0;
+						if (write(clifd, buffer, byte_num) < 0) {
+						printf("[x] Write to client failed.\n");
+						break;
+						}
+					}
+				}
             }
         } else {
             printf("[x] Select() returns -1. ERROR!\n");
@@ -225,9 +299,6 @@ int create_server(int port) {
     return listenfd;
 }
 
-void rate_control() {
-    /**
-     * Implement your main logic of rate control here.
-     * Add return variable or parameters you need.
-     * **/
+void rate_control(int download) {
+    
 }
