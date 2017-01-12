@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/time.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -16,17 +17,17 @@
 #include <arpa/inet.h>
 
 #define MAXSIZE 2048
-#define MAXQSIZE 51200  //50KB
+#define MAXQSIZE 25600  //25KB
 #define FTP_PORT 8740
 #define FTP_PASV_CODE 227
 #define FTP_ADDR "140.114.71.159"
 #define max(X,Y) ((X) > (Y) ? (X) : (Y))
 
 struct Queue{
-	char* queue=NULL;
-	int head=0;
-	int tail=0;
-	int Qsize=0;
+	char* queue;
+	int head;
+	int tail;
+	int Qsize;
 };
 
 int proxy_IP[4];
@@ -125,6 +126,11 @@ int proxy_func(int ser_port, int clifd, int rate) {
 	int j;
 	struct timeval time_start,time_end;
 	
+	Qbuffer.queue=NULL;
+	Qbuffer.head=0;
+	Qbuffer.tail=0;
+	Qbuffer.Qsize=0;
+
 	if(ser_port!=FTP_PORT)
 	{
 		Qbuffer.queue=(char*)malloc(MAXQSIZE+MAXSIZE);
@@ -143,7 +149,7 @@ int proxy_func(int ser_port, int clifd, int rate) {
         return -1;
     }
 
-    // datafd = serfd;
+     datafd = serfd;
 
     // initialize select vars
     FD_ZERO(&allset);
@@ -187,7 +193,7 @@ int proxy_func(int ser_port, int clifd, int rate) {
 				}
 				else
 				{
-					if(Qsize<=MAXQSIZE)
+					if(Qbuffer.Qsize<=MAXQSIZE)
 					{
 						if ((byte_num = read(serfd, buffer, MAXSIZE)) <= 0) {
 						printf("[!] Server terminated the connection.\n");
@@ -198,7 +204,7 @@ int proxy_func(int ser_port, int clifd, int rate) {
 							Qbuffer.queue[Qbuffer.tail++]=buffer[j];
 							if(Qbuffer.tail==MAXQSIZE)Qbuffer.tail=0;
 						}
-						Qsize+=byte_num;
+						Qbuffer.Qsize+=byte_num;
 					}
 				}
 				
@@ -239,36 +245,36 @@ int proxy_func(int ser_port, int clifd, int rate) {
 				else 
 				{
 					gettimeofday(&time_end,NULL);
-					if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>=MAXSIZE/rate/1000)
+					if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>=MAXSIZE/rate/1000){
 						gettimeofday(&time_start,NULL);
-					else
-						continue;
-					if(Qsize>=MAXSIZE)
+					
+					if(Qbuffer.Qsize>=MAXSIZE)
 					{
 						for(j=0;j<byte_num;j++)
 						{
 							buffer[j]=Qbuffer.queue[Qbuffer.head++];
 							if(Qbuffer.head==MAXQSIZE)Qbuffer.head=0;
 						}
-						Qsize-=MAXSIZE;
+						Qbuffer.Qsize-=MAXSIZE;
 						if (write(clifd, buffer, byte_num) < 0) {
 						printf("[x] Write to client failed.\n");
 						break;
 						}
 					}
-					else if(Qsize!=0)
+					else if(Qbuffer.Qsize!=0)
 					{
 						memset(buffer, 0, MAXSIZE);
-						for(j=0;j<Qsize;j++)
+						for(j=0;j<Qbuffer.Qsize;j++)
 						{
 							buffer[j]=Qbuffer.queue[Qbuffer.head++];
 							if(Qbuffer.head==MAXQSIZE)Qbuffer.head=0;
 						}
-						Qsize=0;
+						Qbuffer.Qsize=0;
 						if (write(clifd, buffer, byte_num) < 0) {
 						printf("[x] Write to client failed.\n");
 						break;
 						}
+					}
 					}
 				}
             }
