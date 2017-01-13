@@ -16,8 +16,8 @@
 #include <dirent.h>
 #include <arpa/inet.h>
 
-#define MAXSIZE 2048
-#define MAXQSIZE 26624  //26KBs
+#define MAXSIZE 512
+#define MAXQSIZE 2048  //26KBs
 #define FTP_PORT 8740
 #define FTP_PASV_CODE 227
 #define FTP_ADDR "140.114.71.159"
@@ -121,6 +121,9 @@ int proxy_func(int ser_port, int clifd, int rate) {
     int byte_num;
     int status, pasv[7];
     int childpid;
+    int show = 25;
+    long int diff = 0;
+    long int data = 0;
     socklen_t clilen;
     struct sockaddr_in cliaddr;
 	struct Queue Qbuffer; 
@@ -189,7 +192,8 @@ int proxy_func(int ser_port, int clifd, int rate) {
 				    		while(Qbuffer.Qsize>0)
 							{
 								gettimeofday(&time_end,NULL);
-								if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>2000000/rate)
+                                        			diff = (1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec));								
+								if(diff>500000/rate)
 								{
 								
 									gettimeofday(&time_start,NULL);
@@ -237,7 +241,8 @@ int proxy_func(int ser_port, int clifd, int rate) {
 					}
 					
 					gettimeofday(&time_end,NULL);
-					if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>2000000/rate)
+                                        diff = (1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec));
+					if(diff>500000/rate)
 					{
 						gettimeofday(&time_start,NULL);
 						memset(buffer, 0, MAXSIZE);
@@ -289,13 +294,16 @@ int proxy_func(int ser_port, int clifd, int rate) {
 				else
 				{
 					gettimeofday(&time_end,NULL);
-					if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>2000000/rate)
-					{
+                                        diff = (1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec));
+					if(diff>500000/rate)
+					{       
+						gettimeofday(&time_start,NULL);
 						if ((byte_num = read(serfd, buffer, MAXSIZE)) <= 0) 
 						{
 							printf("[!] Server terminated the connection.\n");
 							break;
 						}
+					        
 					}
 					else
 						byte_num=0;
