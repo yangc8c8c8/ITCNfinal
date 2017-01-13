@@ -118,7 +118,7 @@ int proxy_func(int ser_port, int clifd, int rate) {
     char buffer[MAXSIZE];
     int serfd = -1, datafd = -1, connfd;
     int data_port;
-    int byte_num,old_byte_num;
+    int byte_num;
     int status, pasv[7];
     int childpid;
     socklen_t clilen;
@@ -186,41 +186,41 @@ int proxy_func(int ser_port, int clifd, int rate) {
 					{
 						if ((byte_num = read(clifd, buffer, MAXSIZE)) <= 0) 
 						{
-				    		while()
+				    		while(Qbuffer.Qsize>0)
 							{
 								gettimeofday(&time_end,NULL);
-								if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>MAXSIZE*1000/rate)
+								if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>2000000/rate)
 								{
 								
 									gettimeofday(&time_start,NULL);
 									memset(buffer, 0, MAXSIZE);
 									if(Qbuffer.Qsize>=MAXSIZE)
 									{
-										for(j=0;j<byte_num;j++)
+										for(j=0;j<MAXSIZE;j++)
 										{
 											buffer[j]=Qbuffer.queue[Qbuffer.head++];
 											if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
 										}
 										Qbuffer.Qsize-=MAXSIZE;
-										if (write(serfd, buffer, byte_num) < 0) 
+										if (write(serfd, buffer, MAXSIZE) < 0) 
 										{
 											printf("[x] Write to server failed.\n");
 											break;
 										}
 									}
-									else if(Qbuffer.Qsize!=0)
+									else
 									{
 										for(j=0;j<Qbuffer.Qsize;j++)
 										{
 											buffer[j]=Qbuffer.queue[Qbuffer.head++];
 											if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
 										}
-										Qbuffer.Qsize=0;
-										if (write(serfd, buffer, byte_num) < 0) 
+										if (write(serfd, buffer, Qbuffer.Qsize) < 0) 
 										{
 											printf("[x] Write to server failed.\n");
 											break;
 										}
+										Qbuffer.Qsize=0;
 										break;
 									}
 								}
@@ -235,23 +235,21 @@ int proxy_func(int ser_port, int clifd, int rate) {
 						}
 						Qbuffer.Qsize+=byte_num;
 					}
-					old_byte_num=byte_num;
 					
 					gettimeofday(&time_end,NULL);
-					if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>MAXSIZE*1000/rate)
+					if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>2000000/rate)
 					{
-					
 						gettimeofday(&time_start,NULL);
 						memset(buffer, 0, MAXSIZE);
 						if(Qbuffer.Qsize>=MAXSIZE)
 						{
-							for(j=0;j<byte_num;j++)
+							for(j=0;j<MAXSIZE;j++)
 							{
 								buffer[j]=Qbuffer.queue[Qbuffer.head++];
 								if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
 							}
 							Qbuffer.Qsize-=MAXSIZE;
-							if (write(serfd, buffer, byte_num) < 0) 
+							if (write(serfd, buffer, MAXSIZE) < 0) 
 							{
 								printf("[x] Write to server failed.\n");
 								break;
@@ -264,12 +262,12 @@ int proxy_func(int ser_port, int clifd, int rate) {
 								buffer[j]=Qbuffer.queue[Qbuffer.head++];
 								if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
 							}
-							Qbuffer.Qsize=0;
-							if (write(serfd, buffer, byte_num) < 0) 
+							if (write(serfd, buffer, Qbuffer.Qsize) < 0) 
 							{
 								printf("[x] Write to server failed.\n");
 								break;
 							}
+							Qbuffer.Qsize=0;
 						}
 					}
 				}
@@ -294,29 +292,29 @@ int proxy_func(int ser_port, int clifd, int rate) {
 					{
 						if ((byte_num = read(serfd, buffer, MAXSIZE)) <= 0) 
 						{
-							while(1)
+							while(Qbuffer.Qsize>0)
 							{
 								gettimeofday(&time_end,NULL);
-								if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>MAXSIZE*1000/rate)
+								if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>2000000/rate)
 								{
 								
 									gettimeofday(&time_start,NULL);
 									
 									if(Qbuffer.Qsize>=MAXSIZE)
 									{
-										for(j=0;j<byte_num;j++)
+										for(j=0;j<MAXSIZE;j++)
 										{
 											buffer[j]=Qbuffer.queue[Qbuffer.head++];
 											if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
 										}
 										Qbuffer.Qsize-=MAXSIZE;
-										if (write(clifd, buffer, byte_num) < 0) 
+										if (write(clifd, buffer, MAXSIZE) < 0) 
 										{
 											printf("[x] Write to client failed.\n");
 											break;
 										}
 									}
-									else if(Qbuffer.Qsize!=0)
+									else
 									{
 										memset(buffer, 0, MAXSIZE);
 										for(j=0;j<Qbuffer.Qsize;j++)
@@ -324,13 +322,13 @@ int proxy_func(int ser_port, int clifd, int rate) {
 											buffer[j]=Qbuffer.queue[Qbuffer.head++];
 											if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
 										}
-										Qbuffer.Qsize=0;
-										if (write(clifd, buffer, byte_num) < 0) 
+										
+										if (write(clifd, buffer, Qbuffer.Qsize) < 0) 
 										{
 											printf("[x] Write to client failed.\n");
 											break;
-										}
-										break;
+										}	
+										Qbuffer.Qsize=0;
 									}
 								}
 							}
@@ -346,7 +344,6 @@ int proxy_func(int ser_port, int clifd, int rate) {
 					}
 				}
 			
-				old_byte_num=byte_num;
                 status = atoi(buffer);
 
                 if (status == FTP_PASV_CODE && ser_port == FTP_PORT) {
@@ -384,20 +381,20 @@ int proxy_func(int ser_port, int clifd, int rate) {
 				else 
 				{
 					gettimeofday(&time_end,NULL);
-					if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>MAXSIZE*1000/rate)
+					if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>2000000/rate)
 					{
 					
 						gettimeofday(&time_start,NULL);
 						
 						if(Qbuffer.Qsize>=MAXSIZE)
 						{
-							for(j=0;j<byte_num;j++)
+							for(j=0;j<MAXSIZE;j++)
 							{
 								buffer[j]=Qbuffer.queue[Qbuffer.head++];
 								if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
 							}
 							Qbuffer.Qsize-=MAXSIZE;
-							if (write(clifd, buffer, byte_num) < 0) 
+							if (write(clifd, buffer, MAXSIZE) < 0) 
 							{
 								printf("[x] Write to client failed.\n");
 								break;
@@ -411,12 +408,13 @@ int proxy_func(int ser_port, int clifd, int rate) {
 								buffer[j]=Qbuffer.queue[Qbuffer.head++];
 								if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
 							}
-							Qbuffer.Qsize=0;
-							if (write(clifd, buffer, byte_num) < 0) 
+							
+							if (write(clifd, buffer, Qbuffer.Qsize) < 0) 
 							{
 								printf("[x] Write to client failed.\n");
 								break;
 							}
+							Qbuffer.Qsize=0;
 						}
 					}
 					
