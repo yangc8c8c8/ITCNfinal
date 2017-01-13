@@ -17,7 +17,7 @@
 #include <arpa/inet.h>
 
 #define MAXSIZE 2048
-#define MAXQSIZE 26624  //26KBs
+#define MAXQSIZE 13312//26KBs
 #define FTP_PORT 8740
 #define FTP_PASV_CODE 227
 #define FTP_ADDR "140.114.71.159"
