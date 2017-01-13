@@ -186,16 +186,44 @@ int proxy_func(int ser_port, int clifd, int rate) {
 					{
 						if ((byte_num = read(clifd, buffer, MAXSIZE)) <= 0) 
 						{
-				    		for(j=0;j<Qbuffer.Qsize;j++)
+				    		while()
 							{
-								buffer[j]=Qbuffer.queue[Qbuffer.head++];
-								if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
-							}
-							Qbuffer.Qsize=0;
-							if (write(serfd, buffer, byte_num) < 0) 
-							{
-								printf("[x] Write to server failed.\n");
-								break;
+								gettimeofday(&time_end,NULL);
+								if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>MAXSIZE*1000/rate)
+								{
+								
+									gettimeofday(&time_start,NULL);
+									memset(buffer, 0, MAXSIZE);
+									if(Qbuffer.Qsize>=MAXSIZE)
+									{
+										for(j=0;j<byte_num;j++)
+										{
+											buffer[j]=Qbuffer.queue[Qbuffer.head++];
+											if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
+										}
+										Qbuffer.Qsize-=MAXSIZE;
+										if (write(serfd, buffer, byte_num) < 0) 
+										{
+											printf("[x] Write to server failed.\n");
+											break;
+										}
+									}
+									else if(Qbuffer.Qsize!=0)
+									{
+										for(j=0;j<Qbuffer.Qsize;j++)
+										{
+											buffer[j]=Qbuffer.queue[Qbuffer.head++];
+											if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
+										}
+										Qbuffer.Qsize=0;
+										if (write(serfd, buffer, byte_num) < 0) 
+										{
+											printf("[x] Write to server failed.\n");
+											break;
+										}
+										break;
+									}
+								}
 							}
 							printf("[!] Client terminated the connection.\n");
 							break;
@@ -266,17 +294,45 @@ int proxy_func(int ser_port, int clifd, int rate) {
 					{
 						if ((byte_num = read(serfd, buffer, MAXSIZE)) <= 0) 
 						{
-				    		memset(buffer, 0, MAXSIZE);
-							for(j=0;j<Qbuffer.Qsize;j++)
+							while(1)
 							{
-								buffer[j]=Qbuffer.queue[Qbuffer.head++];
-								if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
-							}
-							Qbuffer.Qsize=0;
-							if (write(clifd, buffer, byte_num) < 0) 
-							{
-								printf("[x] Write to client failed.\n");
-								break;
+								gettimeofday(&time_end,NULL);
+								if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>MAXSIZE*1000/rate)
+								{
+								
+									gettimeofday(&time_start,NULL);
+									
+									if(Qbuffer.Qsize>=MAXSIZE)
+									{
+										for(j=0;j<byte_num;j++)
+										{
+											buffer[j]=Qbuffer.queue[Qbuffer.head++];
+											if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
+										}
+										Qbuffer.Qsize-=MAXSIZE;
+										if (write(clifd, buffer, byte_num) < 0) 
+										{
+											printf("[x] Write to client failed.\n");
+											break;
+										}
+									}
+									else if(Qbuffer.Qsize!=0)
+									{
+										memset(buffer, 0, MAXSIZE);
+										for(j=0;j<Qbuffer.Qsize;j++)
+										{
+											buffer[j]=Qbuffer.queue[Qbuffer.head++];
+											if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
+										}
+										Qbuffer.Qsize=0;
+										if (write(clifd, buffer, byte_num) < 0) 
+										{
+											printf("[x] Write to client failed.\n");
+											break;
+										}
+										break;
+									}
+								}
 							}
 							printf("[!] Server terminated the connection.\n");
 							break;
