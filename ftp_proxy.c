@@ -17,7 +17,7 @@
 #include <arpa/inet.h>
 
 #define MAXSIZE 2048
-#define MAXQSIZE 25600  //25KBs
+#define MAXQSIZE 26624  //26KBs
 #define FTP_PORT 8740
 #define FTP_PASV_CODE 227
 #define FTP_ADDR "140.114.71.159"
@@ -169,15 +169,82 @@ int proxy_func(int ser_port, int clifd, int rate) {
             // check FTP client socket fd
             if (FD_ISSET(clifd, &rset)) {
                 memset(buffer, 0, MAXSIZE);
-                if ((byte_num = read(clifd, buffer, MAXSIZE)) <= 0) {
-                    printf("[!] Client terminated the connection.\n");
-                    break;
-                }
-
-                if (write(serfd, buffer, byte_num) < 0) {
-                    printf("[x] Write to server failed.\n");
-                    break;
-                }
+                if(ser_port==FTP_PORT)
+				{
+					if ((byte_num = read(clifd, buffer, MAXSIZE)) <= 0) {
+						printf("[!] Client terminated the connection.\n");
+						break;
+					}
+					if (write(serfd, buffer, byte_num) < 0) {
+						printf("[x] Write to server failed.\n");
+						break;
+					}
+				}
+				else
+				{
+					if(Qbuffer.Qsize<=MAXQSIZE)
+					{
+						if ((byte_num = read(clifd, buffer, MAXSIZE)) <= 0) 
+						{
+				    		for(j=0;j<Qbuffer.Qsize;j++)
+							{
+								buffer[j]=Qbuffer.queue[Qbuffer.head++];
+								if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
+							}
+							Qbuffer.Qsize=0;
+							if (write(serfd, buffer, byte_num) < 0) 
+							{
+								printf("[x] Write to server failed.\n");
+								break;
+							}
+							printf("[!] Client terminated the connection.\n");
+							break;
+						}
+						for(j=0;j<byte_num;j++)
+						{
+							Qbuffer.queue[Qbuffer.tail++]=buffer[j];
+							if(Qbuffer.tail==MAXQSIZE+MAXSIZE)Qbuffer.tail=0;
+						}
+						Qbuffer.Qsize+=byte_num;
+					}
+					old_byte_num=byte_num;
+					
+					gettimeofday(&time_end,NULL);
+					if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>MAXSIZE*1000/rate)
+					{
+					
+						gettimeofday(&time_start,NULL);
+						memset(buffer, 0, MAXSIZE);
+						if(Qbuffer.Qsize>=MAXSIZE)
+						{
+							for(j=0;j<byte_num;j++)
+							{
+								buffer[j]=Qbuffer.queue[Qbuffer.head++];
+								if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
+							}
+							Qbuffer.Qsize-=MAXSIZE;
+							if (write(serfd, buffer, byte_num) < 0) 
+							{
+								printf("[x] Write to server failed.\n");
+								break;
+							}
+						}
+						else if(Qbuffer.Qsize!=0)
+						{
+							for(j=0;j<Qbuffer.Qsize;j++)
+							{
+								buffer[j]=Qbuffer.queue[Qbuffer.head++];
+								if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
+							}
+							Qbuffer.Qsize=0;
+							if (write(serfd, buffer, byte_num) < 0) 
+							{
+								printf("[x] Write to server failed.\n");
+								break;
+							}
+						}
+					}
+				}
             }
 
             // check FTP server socket fd
@@ -186,22 +253,33 @@ int proxy_func(int ser_port, int clifd, int rate) {
 				
 				if(ser_port==FTP_PORT)
 				{
-					if ((byte_num = read(serfd, buffer, MAXSIZE)) <= 0) {
-                    printf("[!] Server terminated the connection.\n");
-                    break;
-					}buffer[byte_num] = '\0';
+					if ((byte_num = read(serfd, buffer, MAXSIZE)) <= 0) 
+					{
+						printf("[!] Server terminated the connection.\n");
+						break;
+					}
+					buffer[byte_num] = '\0';
 				}
 				else
 				{
 					if(Qbuffer.Qsize<=MAXQSIZE)
 					{
-						if ((byte_num = read(serfd, buffer, MAXSIZE)) <= 0) {
-				    			if (write(clifd, buffer, old_byte_num) < 0) {
-                    						printf("[x] Write to client failed.\n");
-                						break;
+						if ((byte_num = read(serfd, buffer, MAXSIZE)) <= 0) 
+						{
+				    		memset(buffer, 0, MAXSIZE);
+							for(j=0;j<Qbuffer.Qsize;j++)
+							{
+								buffer[j]=Qbuffer.queue[Qbuffer.head++];
+								if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
 							}
-						printf("[!] Server terminated the connection.\n");
-						break;
+							Qbuffer.Qsize=0;
+							if (write(clifd, buffer, byte_num) < 0) 
+							{
+								printf("[x] Write to client failed.\n");
+								break;
+							}
+							printf("[!] Server terminated the connection.\n");
+							break;
 						}
 						for(j=0;j<byte_num;j++)
 						{
@@ -212,7 +290,7 @@ int proxy_func(int ser_port, int clifd, int rate) {
 					}
 				}
 			
-		old_byte_num=byte_num;
+				old_byte_num=byte_num;
                 status = atoi(buffer);
 
                 if (status == FTP_PASV_CODE && ser_port == FTP_PORT) {
@@ -241,9 +319,10 @@ int proxy_func(int ser_port, int clifd, int rate) {
 
 				if(ser_port==FTP_PORT)
 				{
-					if (write(clifd, buffer, byte_num) < 0) {
-                    printf("[x] Write to client failed.\n");
-                    break;
+					if (write(clifd, buffer, byte_num) < 0) 
+					{
+						printf("[x] Write to client failed.\n");
+						break;
 					}
 				}
 				else 
@@ -252,35 +331,37 @@ int proxy_func(int ser_port, int clifd, int rate) {
 					if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>MAXSIZE*1000/rate)
 					{
 					
-					gettimeofday(&time_start,NULL);
-					
-					if(Qbuffer.Qsize>=MAXSIZE)
-					{
-						for(j=0;j<byte_num;j++)
+						gettimeofday(&time_start,NULL);
+						
+						if(Qbuffer.Qsize>=MAXSIZE)
 						{
-							buffer[j]=Qbuffer.queue[Qbuffer.head++];
-							if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
+							for(j=0;j<byte_num;j++)
+							{
+								buffer[j]=Qbuffer.queue[Qbuffer.head++];
+								if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
+							}
+							Qbuffer.Qsize-=MAXSIZE;
+							if (write(clifd, buffer, byte_num) < 0) 
+							{
+								printf("[x] Write to client failed.\n");
+								break;
+							}
 						}
-						Qbuffer.Qsize-=MAXSIZE;
-						if (write(clifd, buffer, byte_num) < 0) {
-						printf("[x] Write to client failed.\n");
-						break;
-						}
-					}
-					else if(Qbuffer.Qsize!=0)
-					{
-						memset(buffer, 0, MAXSIZE);
-						for(j=0;j<Qbuffer.Qsize;j++)
+						else if(Qbuffer.Qsize!=0)
 						{
-							buffer[j]=Qbuffer.queue[Qbuffer.head++];
-							if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
+							memset(buffer, 0, MAXSIZE);
+							for(j=0;j<Qbuffer.Qsize;j++)
+							{
+								buffer[j]=Qbuffer.queue[Qbuffer.head++];
+								if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
+							}
+							Qbuffer.Qsize=0;
+							if (write(clifd, buffer, byte_num) < 0) 
+							{
+								printf("[x] Write to client failed.\n");
+								break;
+							}
 						}
-						Qbuffer.Qsize=0;
-						if (write(clifd, buffer, byte_num) < 0) {
-						printf("[x] Write to client failed.\n");
-						break;
-						}
-					}
 					}
 					
 				}
