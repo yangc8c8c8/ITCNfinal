@@ -186,7 +186,7 @@ int proxy_func(int ser_port, int clifd, int rate) {
 				else
 				{
 					gettimeofday(&time_end,NULL);
-					if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>500000/rate)
+					if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>MAXSIZE*1000/rate)
 					{
 						gettimeofday(&time_start,NULL);
 						if ((byte_num = read(clifd, buffer, MAXSIZE)) <= 0) 
@@ -227,7 +227,7 @@ int proxy_func(int ser_port, int clifd, int rate) {
 				{
 					gettimeofday(&time_end,NULL);
                                         diff = (1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec));
-					if(diff>500000/rate)
+					if(diff>MAXSIZE*1000/rate)
 					{       
 						gettimeofday(&time_start,NULL);
 						if ((byte_num = read(serfd, buffer, MAXSIZE)) <= 0) 
@@ -259,7 +259,9 @@ int proxy_func(int ser_port, int clifd, int rate) {
                             printf("[x] Accept failed\n");
                             return 0;
                         }
-
+			close(datafd);
+			close(serfd);
+			close(clifd);
                         printf("[v] Data connection from: %s:%d connect.\n", inet_ntoa(cliaddr.sin_addr), htons(cliaddr.sin_port));
                         proxy_func(data_port, connfd, rate);
                         printf("[!] End of data connection!\n");
