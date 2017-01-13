@@ -17,7 +17,7 @@
 #include <arpa/inet.h>
 
 #define MAXSIZE 2048
-#define MAXQSIZE 13312//26KBs
+#define MAXQSIZE 26624  //26KBs
 #define FTP_PORT 8740
 #define FTP_PASV_CODE 227
 #define FTP_ADDR "140.114.71.159"
@@ -288,60 +288,17 @@ int proxy_func(int ser_port, int clifd, int rate) {
 				}
 				else
 				{
-					if(Qbuffer.Qsize<=MAXQSIZE)
+					gettimeofday(&time_end,NULL);
+					if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>2000000/rate)
 					{
 						if ((byte_num = read(serfd, buffer, MAXSIZE)) <= 0) 
 						{
-							while(Qbuffer.Qsize>0)
-							{
-								gettimeofday(&time_end,NULL);
-								if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>2000000/rate)
-								{
-								
-									gettimeofday(&time_start,NULL);
-									
-									if(Qbuffer.Qsize>=MAXSIZE)
-									{
-										for(j=0;j<MAXSIZE;j++)
-										{
-											buffer[j]=Qbuffer.queue[Qbuffer.head++];
-											if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
-										}
-										Qbuffer.Qsize-=MAXSIZE;
-										if (write(clifd, buffer, MAXSIZE) < 0) 
-										{
-											printf("[x] Write to client failed.\n");
-											break;
-										}
-									}
-									else
-									{
-										memset(buffer, 0, MAXSIZE);
-										for(j=0;j<Qbuffer.Qsize;j++)
-										{
-											buffer[j]=Qbuffer.queue[Qbuffer.head++];
-											if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
-										}
-										
-										if (write(clifd, buffer, Qbuffer.Qsize) < 0) 
-										{
-											printf("[x] Write to client failed.\n");
-											break;
-										}	
-										Qbuffer.Qsize=0;
-									}
-								}
-							}
 							printf("[!] Server terminated the connection.\n");
 							break;
 						}
-						for(j=0;j<byte_num;j++)
-						{
-							Qbuffer.queue[Qbuffer.tail++]=buffer[j];
-							if(Qbuffer.tail==MAXQSIZE+MAXSIZE)Qbuffer.tail=0;
-						}
-						Qbuffer.Qsize+=byte_num;
 					}
+					else
+						byte_num=0;
 				}
 			
                 status = atoi(buffer);
@@ -380,44 +337,14 @@ int proxy_func(int ser_port, int clifd, int rate) {
 				}
 				else 
 				{
-					gettimeofday(&time_end,NULL);
-					if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>2000000/rate)
+					if(byte_num>0)
 					{
-					
-						gettimeofday(&time_start,NULL);
-						
-						if(Qbuffer.Qsize>=MAXSIZE)
+						if (write(clifd, buffer, byte_num) < 0) 
 						{
-							for(j=0;j<MAXSIZE;j++)
-							{
-								buffer[j]=Qbuffer.queue[Qbuffer.head++];
-								if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
-							}
-							Qbuffer.Qsize-=MAXSIZE;
-							if (write(clifd, buffer, MAXSIZE) < 0) 
-							{
-								printf("[x] Write to client failed.\n");
-								break;
-							}
-						}
-						else if(Qbuffer.Qsize!=0)
-						{
-							memset(buffer, 0, MAXSIZE);
-							for(j=0;j<Qbuffer.Qsize;j++)
-							{
-								buffer[j]=Qbuffer.queue[Qbuffer.head++];
-								if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
-							}
-							
-							if (write(clifd, buffer, Qbuffer.Qsize) < 0) 
-							{
-								printf("[x] Write to client failed.\n");
-								break;
-							}
-							Qbuffer.Qsize=0;
+							printf("[x] Write to client failed.\n");
+							break;
 						}
 					}
-					
 				}
             }
         } else {
