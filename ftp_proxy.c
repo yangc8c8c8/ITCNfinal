@@ -49,6 +49,7 @@ int main (int argc, char **argv) {
 
     sscanf(argv[1], " %d.%d.%d.%d", &proxy_IP[0], &proxy_IP[1], &proxy_IP[2], &proxy_IP[3]);
     port = atoi(argv[2]);
+    rate=atoi(argv[3]);
 
     ctrlfd = create_server(port);
     clilen = sizeof(struct sockaddr_in);
@@ -195,7 +196,7 @@ int proxy_func(int ser_port, int clifd, int rate) {
 					if(Qbuffer.Qsize<=MAXQSIZE)
 					{
 						if ((byte_num = read(serfd, buffer, MAXSIZE)) <= 0) {
-				    			if (write(clifd, buffer, byte_num) < 0) {
+				    			if (write(clifd, buffer, old_byte_num) < 0) {
                     						printf("[x] Write to client failed.\n");
                 						break;
 							}
@@ -248,7 +249,7 @@ int proxy_func(int ser_port, int clifd, int rate) {
 				else 
 				{
 					gettimeofday(&time_end,NULL);
-					if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>2048000/rate)
+					if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>MAXSIZE*1000/rate)
 					{
 					
 					gettimeofday(&time_start,NULL);
