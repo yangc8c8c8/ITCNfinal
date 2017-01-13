@@ -185,96 +185,28 @@ int proxy_func(int ser_port, int clifd, int rate) {
 				}
 				else
 				{
-					if(Qbuffer.Qsize<=MAXQSIZE)
+					gettimeofday(&time_end,NULL);
+					if((1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec))>500000/rate)
 					{
+						gettimeofday(&time_start,NULL);
 						if ((byte_num = read(clifd, buffer, MAXSIZE)) <= 0) 
 						{
-				    		while(Qbuffer.Qsize>0)
-							{
-								gettimeofday(&time_end,NULL);
-                                        			diff = (1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec));								
-								if(diff>500000/rate)
-								{
-								
-									gettimeofday(&time_start,NULL);
-									memset(buffer, 0, MAXSIZE);
-									if(Qbuffer.Qsize>=MAXSIZE)
-									{
-										for(j=0;j<MAXSIZE;j++)
-										{
-											buffer[j]=Qbuffer.queue[Qbuffer.head++];
-											if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
-										}
-										Qbuffer.Qsize-=MAXSIZE;
-										if (write(serfd, buffer, MAXSIZE) < 0) 
-										{
-											printf("[x] Write to server failed.\n");
-											break;
-										}
-									}
-									else
-									{
-										for(j=0;j<Qbuffer.Qsize;j++)
-										{
-											buffer[j]=Qbuffer.queue[Qbuffer.head++];
-											if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
-										}
-										if (write(serfd, buffer, Qbuffer.Qsize) < 0) 
-										{
-											printf("[x] Write to server failed.\n");
-											break;
-										}
-										Qbuffer.Qsize=0;
-										break;
-									}
-								}
-							}
 							printf("[!] Client terminated the connection.\n");
 							break;
 						}
-						for(j=0;j<byte_num;j++)
+					}
+					else
+						byte_num=0;
+					
+					if(byte_num>0)
+					{
+						if (write(serfd, buffer,byte_num) < 0) 
 						{
-							Qbuffer.queue[Qbuffer.tail++]=buffer[j];
-							if(Qbuffer.tail==MAXQSIZE+MAXSIZE)Qbuffer.tail=0;
+							printf("[x] Write to server failed.\n");
+							break;
 						}
-						Qbuffer.Qsize+=byte_num;
 					}
 					
-					gettimeofday(&time_end,NULL);
-                                        diff = (1000000*(time_end.tv_sec-time_start.tv_sec)+(time_end.tv_usec-time_start.tv_usec));
-					if(diff>500000/rate)
-					{
-						gettimeofday(&time_start,NULL);
-						memset(buffer, 0, MAXSIZE);
-						if(Qbuffer.Qsize>=MAXSIZE)
-						{
-							for(j=0;j<MAXSIZE;j++)
-							{
-								buffer[j]=Qbuffer.queue[Qbuffer.head++];
-								if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
-							}
-							Qbuffer.Qsize-=MAXSIZE;
-							if (write(serfd, buffer, MAXSIZE) < 0) 
-							{
-								printf("[x] Write to server failed.\n");
-								break;
-							}
-						}
-						else if(Qbuffer.Qsize!=0)
-						{
-							for(j=0;j<Qbuffer.Qsize;j++)
-							{
-								buffer[j]=Qbuffer.queue[Qbuffer.head++];
-								if(Qbuffer.head==MAXQSIZE+MAXSIZE)Qbuffer.head=0;
-							}
-							if (write(serfd, buffer, Qbuffer.Qsize) < 0) 
-							{
-								printf("[x] Write to server failed.\n");
-								break;
-							}
-							Qbuffer.Qsize=0;
-						}
-					}
 				}
             }
 
