@@ -17,25 +17,17 @@
 #include <arpa/inet.h>
 
 #define MAXSIZE 512
-#define MAXQSIZE 2048  //26KBs
 #define FTP_PORT 8740
 #define FTP_PASV_CODE 227
 #define FTP_ADDR "140.114.71.159"
 #define max(X,Y) ((X) > (Y) ? (X) : (Y))
 
-struct Queue{
-	char* queue;
-	int head;
-	int tail;
-	int Qsize;
-};
 
 int proxy_IP[4];
 
 int connect_FTP(int ser_port, int clifd);
 int proxy_func(int ser_port, int clifd, int rate);
 int create_server(int port);
-void rate_control();
 
 int main (int argc, char **argv) {
     int ctrlfd, connfd, port, rate = 0;
@@ -126,18 +118,11 @@ int proxy_func(int ser_port, int clifd, int rate) {
     long int data = 0;
     socklen_t clilen;
     struct sockaddr_in cliaddr;
-	struct Queue Qbuffer; 
-	int j;
 	struct timeval time_start,time_end;
 	
-	Qbuffer.queue=NULL;
-	Qbuffer.head=0;
-	Qbuffer.tail=0;
-	Qbuffer.Qsize=0;
 
 	if(ser_port!=FTP_PORT)
 	{
-		Qbuffer.queue=(char*)malloc(MAXQSIZE+MAXSIZE);
 		gettimeofday(&time_start,NULL);  //reset time_start
 	}
 		
@@ -294,7 +279,7 @@ int proxy_func(int ser_port, int clifd, int rate) {
             return -1;
         }
     }
-    free(Qbuffer.queue);
+	
     return 0;
 }
 
@@ -317,6 +302,3 @@ int create_server(int port) {
     return listenfd;
 }
 
-void rate_control(int download) {
-    
-}
